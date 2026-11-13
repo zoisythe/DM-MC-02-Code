@@ -1,0 +1,27 @@
+{
+    "version": 4,
+    "configurePresets": [
+        {
+            "name": "arm-clang",
+            "hidden": true,
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/${presetName}",
+            "toolchainFile": "${sourceDir}/cmake/starm-clang.cmake",
+            "environment": { "CMAKE_TOOLCHAIN_FILE": null }
+        },
+        {
+            "name": "Debug",
+            "inherits": "arm-clang",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" }
+        },
+        {
+            "name": "Release",
+            "inherits": "arm-clang",
+            "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" }
+        }
+    ],
+    "buildPresets": [
+        { "name": "Debug", "configurePreset": "Debug" },
+        { "name": "Release", "configurePreset": "Release" }
+    ]
+}

@@ -1,0 +1,17 @@
+{
+    "cmake.environment": {
+        "CMAKE_TOOLCHAIN_FILE": ""
+    },
+    "cmake.cmakePath": "cube-cmake",
+    "cmake.configureArgs": [
+        "-DCMAKE_COMMAND=cube-cmake"
+    ],
+    "cmake.preferredGenerators": [
+        "Ninja"
+    ],
+    "stm32cube-ide-clangd.path": "cube",
+    "stm32cube-ide-clangd.arguments": [
+        "starm-clangd",
+        "--query-driver=${env:CUBE_BUNDLE_PATH}/st-arm-clang/*/bin/starm-clang*"
+    ]
+}
