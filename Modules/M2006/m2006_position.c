@@ -26,27 +26,42 @@ void m2006_position_feedback(uint16_t angle, uint32_t now)
     m2006_position.last_ms = now;
 }
 void m2006_position_stop(void) { m2006_position.speed = 0; }
-int m2006_position_speed(int percent)
+
+/* 保留原来接近端点时的减速斜率。 */
+static int end_speed_limit(int32_t remaining_counts)
 {
-    if (percent < 0 || !m2006_position.initialized || m2006_position.fault) {
-        m2006_position_stop(); return 0;
+    if (remaining_counts <= M2006_END_MARGIN_COUNTS) {
+        return 0;
     }
-    if (percent > 100) percent = 100;
-    m2006_position.target = (M2006_FULL_COUNTS / 100) * percent;
-    int32_t error = m2006_position.target - m2006_position.count;
-    /* 先限误差再乘增益，避免异常数值溢出；30 mm 误差达到限速。 */
-    int32_t bounded = error;
-    if (bounded > 30 * M2006_COUNTS_PER_MM) bounded = 30 * M2006_COUNTS_PER_MM;
-    if (bounded < -30 * M2006_COUNTS_PER_MM) bounded = -30 * M2006_COUNTS_PER_MM;
-    int desired = bounded * M2006_POSITION_KP / M2006_COUNTS_PER_MM;
-    if (error <= M2006_POSITION_DEADBAND && error >= -M2006_POSITION_DEADBAND) desired = 0;
-    int step = desired - m2006_position.speed;
+    const int32_t slowdown_counts = M2006_END_SLOWDOWN_MM * M2006_COUNTS_PER_MM;
+    if (remaining_counts >= slowdown_counts) {
+        return M2006_MAX_ROTOR_RPM;
+    }
+    const int rpm_per_mm = M2006_MAX_ROTOR_RPM / M2006_END_SLOWDOWN_MM;
+    return remaining_counts * rpm_per_mm / M2006_COUNTS_PER_MM;
+}
+
+int m2006_position_speed(int requested_rpm)
+{
+    if (!m2006_position.initialized || m2006_position.fault) {
+        m2006_position_stop();
+        return 0;
+    }
+    int step = requested_rpm - m2006_position.speed;
     if (step > M2006_ACCEL_RPM_PER_MS) step = M2006_ACCEL_RPM_PER_MS;
     if (step < -M2006_ACCEL_RPM_PER_MS) step = -M2006_ACCEL_RPM_PER_MS;
     m2006_position.speed += step;
-    /* 端点禁止继续向行程外给目标速度。 */
-    if ((m2006_position.count <= 0 && m2006_position.speed < 0) ||
-        (m2006_position.count >= M2006_FULL_COUNTS && m2006_position.speed > 0))
-        m2006_position.speed = 0;
+    /* 斜坡之后仍受当前方向的行程限制，从端点向内运行时可正常提速。 */
+    if (m2006_position.speed > 0) {
+        int upper_limit = end_speed_limit(M2006_FULL_COUNTS - m2006_position.count);
+        if (m2006_position.speed > upper_limit) {
+            m2006_position.speed = upper_limit;
+        }
+    } else if (m2006_position.speed < 0) {
+        int lower_limit = -end_speed_limit(m2006_position.count);
+        if (m2006_position.speed < lower_limit) {
+            m2006_position.speed = lower_limit;
+        }
+    }
     return m2006_position.speed * M2006_DIRECTION;
 }

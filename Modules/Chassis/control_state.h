@@ -8,11 +8,7 @@
 enum
 {
     CHASSIS_FEEDBACK_TIMEOUT_MS = 100,
-    CHASSIS_BRAKE_FEEDBACK_MS = 20,
-    CHASSIS_BRAKE_GAIN = 2,
-    CHASSIS_BRAKE_CURRENT_LIMIT = 800,
-    CHASSIS_BRAKE_STOP_RPM = 50,
-    CHASSIS_BRAKE_TIMEOUT_MS = 750,
+    CHASSIS_STOP_FEEDBACK_MS = 20,
     CHASSIS_TX_TIMEOUT_MS = 10,
     CHASSIS_RECOVERY_WAIT_MS = 100,
     CHASSIS_READY_FRAMES = 20
@@ -26,7 +22,7 @@ enum control_phase
     CONTROL_RUNNING = 4,            /* 正在计算并发送驱动电流 */
     CONTROL_RECOVERING = 7,         /* 通信异常后暂发零电流，等待恢复 */
     CONTROL_ARMED = 8,              /* 已回中解锁，等待拨杆 */
-    CONTROL_BRAKING = 9             /* 正常松杆，限流减速 */
+    CONTROL_DECELERATING = 9        /* 正常松杆，四轮目标同步降速 */
 };
 
 enum recovery_reason
@@ -42,7 +38,7 @@ struct chassis_control_state
 {
     enum control_phase phase;
     enum recovery_reason recovery_reason;
-    uint32_t recovery_started_ms, recovery_zero_frames, brake_started_ms;
+    uint32_t recovery_started_ms, recovery_zero_frames, stop_started_ms;
     uint32_t wait_frame, remote_interruptions;
     uint32_t tx_started_ms;
     bool ready_for_center;
@@ -55,7 +51,6 @@ struct chassis_control_input
     enum recovery_reason can_fault;
     bool remote_valid, centered;
     bool hardware_ready, feedback_ready, feedback_fresh;
-    bool wheels_slow;
     bool tx_pending, tx_sent;
 };
 
@@ -67,6 +62,5 @@ struct chassis_control_output
 struct chassis_control_output chassis_control_step(struct chassis_control_state *state,
                                                   const struct chassis_control_input *input);
 void chassis_control_note_tx(struct chassis_control_state *state, uint32_t now, bool nonzero);
-int chassis_brake_current(int rotor_rpm);
 
 #endif

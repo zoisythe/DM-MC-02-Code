@@ -1,21 +1,26 @@
 #include "m2006_remote.h"
+#include "m2006_position.h"
 
-/* 将丝杆的 VRA 输入转换为整数百分比，并钳位端点。 */
-int m2006_remote_percent(const struct sbus_receiver *receiver, uint32_t now)
+int m2006_remote_speed_rpm(uint16_t raw)
 {
-    if (receiver->failsafe_active || !sbus_has_recent_command(receiver, now))
+    const int lower = M2006_VRA_CENTER - M2006_VRA_DEADBAND;
+    const int upper = M2006_VRA_CENTER + M2006_VRA_DEADBAND;
+    int value = raw;
+    if (value < (int)M2006_VRA_LEFT)
     {
-        return -1;
+        value = M2006_VRA_LEFT;
     }
-    uint32_t raw = receiver->channels[M2006_VRA_CHANNEL];
-    if (raw <= M2006_VRA_LEFT)
+    if (value > (int)M2006_VRA_RIGHT)
     {
-        return 0;
+        value = M2006_VRA_RIGHT;
     }
-    if (raw >= M2006_VRA_RIGHT)
+    if (value < lower)
     {
-        return 100;
+        return (value - lower) * M2006_MAX_ROTOR_RPM / (lower - (int)M2006_VRA_LEFT);
     }
-    uint32_t span = M2006_VRA_RIGHT - M2006_VRA_LEFT;
-    return (int)(((raw - M2006_VRA_LEFT) * 100u + span / 2u) / span);
+    if (value > upper)
+    {
+        return (value - upper) * M2006_MAX_ROTOR_RPM / ((int)M2006_VRA_RIGHT - upper);
+    }
+    return 0;
 }

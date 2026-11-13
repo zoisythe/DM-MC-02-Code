@@ -275,25 +275,34 @@ void chassis_control_init(void)
     chassis_status.phase = control.phase;
 }
 /* 运行状态已经由控制状态机确定，电机输出只由本周期状态产生。 */
-static void update_motor_commands(uint16_t vertical, uint16_t horizontal)
+static void update_motor_commands(uint32_t now, uint16_t vertical, uint16_t horizontal)
 {
     bool driving = control.phase == CONTROL_RUNNING;
-    bool braking = control.phase == CONTROL_BRAKING;
-    bool armed = driving || braking || control.phase == CONTROL_ARMED;
-    chassis_update(armed, armed, vertical, horizontal, sbus_status.channels[CHASSIS_MODE_CHANNEL]);
+    bool decelerating = control.phase == CONTROL_DECELERATING;
+    if (decelerating)
+    {
+        chassis_decelerate(now - control.stop_started_ms);
+    }
+    else
+    {
+        bool armed = driving || control.phase == CONTROL_ARMED;
+        chassis_update(armed, armed, vertical, horizontal, sbus_status.channels[CHASSIS_MODE_CHANNEL]);
+    }
 
     for (uint32_t i = 0; i < CHASSIS_WHEEL_COUNT; ++i)
     {
         int integral = 0;
         int command = 0;
-        if (driving && chassis.moving)
+        if ((driving && chassis.moving) || decelerating)
         {
-            integral = motors[i].integral_x20;
-            command = chassis_speed_current(chassis.targets[i], motors[i].rotor_rpm, &integral);
-        }
-        else if (braking)
-        {
-            command = chassis_brake_current(motors[i].rotor_rpm);
+            int target = chassis.targets[i];
+            integral = target == 0 ? 0 : motors[i].integral_x20;
+            command = chassis_speed_current(target, motors[i].rotor_rpm, &integral);
+            if (target == 0)
+            {
+                /* 换向经过零速目标时，清除上一个方向的积分。 */
+                integral = 0;
+            }
         }
         motors[i].integral_x20 = integral;
         motors[i].command_current = command;
@@ -303,24 +312,11 @@ static void update_motor_commands(uint16_t vertical, uint16_t horizontal)
             motors[i].peak_abs_command = magnitude;
         }
     }
-    chassis_status.action_active = driving || braking;
+    chassis_status.action_active = driving || decelerating;
     chassis_status.target_rotor_rpm = chassis.targets[WHEEL_FRONT_LEFT];
     chassis_status.command_current = motors[WHEEL_FRONT_LEFT].command_current;
     chassis_status.speed_integral_x20 = motors[WHEEL_FRONT_LEFT].integral_x20;
     chassis_status.peak_abs_command = motors[WHEEL_FRONT_LEFT].peak_abs_command;
-}
-
-static bool all_wheels_slow(void)
-{
-    for (uint32_t i = 0; i < CHASSIS_WHEEL_COUNT; ++i)
-    {
-        int rpm = motors[i].rotor_rpm;
-        if (rpm < -CHASSIS_BRAKE_STOP_RPM || rpm > CHASSIS_BRAKE_STOP_RPM)
-        {
-            return false;
-        }
-    }
-    return true;
 }
 
 static uint32_t status_color(uint32_t now, bool remote_valid)
@@ -400,8 +396,7 @@ void chassis_control_poll(void)
         .hardware_ready = !startup_wait && feedback_ready &&
                           chassis_status.completed >= CHASSIS_READY_FRAMES,
         .feedback_ready = feedback_ready,
-        .feedback_fresh = all_feedback_ready(now, CHASSIS_BRAKE_FEEDBACK_MS),
-        .wheels_slow = all_wheels_slow(),
+        .feedback_fresh = all_feedback_ready(now, CHASSIS_STOP_FEEDBACK_MS),
         .tx_pending = tx_pending,
         .tx_sent = !tx_pending && (REG(CAN + TXBTO) & CHASSIS_TX_MASK) != 0u,
     };
@@ -419,7 +414,7 @@ void chassis_control_poll(void)
     chassis_status.last_recovery_reason = control.recovery_reason;
     chassis_status.recovery_until_ms = control.recovery_started_ms + CHASSIS_RECOVERY_WAIT_MS;
     chassis_status.recovery_zero_frames = control.recovery_zero_frames;
-    update_motor_commands(vertical, horizontal);
+    update_motor_commands(now, vertical, horizontal);
 
     if (!tx_pending && !startup_wait && !busoff && !can_in_init)
     {

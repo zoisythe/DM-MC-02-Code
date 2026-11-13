@@ -1,15 +1,16 @@
-/* VRA -> 丝杆位置 P -> 转速 PI -> C610 ID5；无 SWB/SWD 和定时动作。 */
+/* VRA -> 带行程限制的升降速度 -> 转速 PI -> C610 ID5。 */
 #include "m2006_control.h"
 #include "m2006_remote.h"
 #include "m2006_position.h"
 #include "m2006_speed_control.h"
 #include "board.h"
+#include "sbus.h"
 #define M2006_TX_MASK 2u
 #define M2006_TX_ADDR (RAM + TX_OFFSET + 16u)
 volatile struct {
     uint32_t milliseconds, feedback_frames, last_feedback_ms;
     uint32_t requested, completed, tx_timeouts, position_fault;
-    int target_percent, target_rotor_rpm, rotor_rpm, measured_current, command_current, speed_integral_x20;
+    int requested_rpm, target_rotor_rpm, rotor_rpm, measured_current, command_current, speed_integral_x20;
 } m2006_status;
 static uint32_t enabled, tick, processed_tick, pending, last_tx_ms, tx_fault;
 void m2006_control_set_time(uint32_t now) { tick = now; }
@@ -56,16 +57,22 @@ void m2006_control_poll(void)
         if ((REG(CAN + TXBTO) & M2006_TX_MASK) != 0u) ++m2006_status.completed;
         pending = 0;
     }
-    int percent = m2006_remote_percent(&sbus_status, now);
-    m2006_status.target_percent = percent;
-    int ready = now >= 2000u && percent >= 0 && m2006_status.feedback_frames >= 20u &&
+    bool remote_valid = !sbus_status.failsafe_active && sbus_has_recent_command(&sbus_status, now);
+    int requested_rpm = remote_valid ? m2006_remote_speed_rpm(sbus_status.channels[M2006_VRA_CHANNEL]) : 0;
+    m2006_status.requested_rpm = requested_rpm;
+    int ready = now >= 2000u && remote_valid && m2006_status.feedback_frames >= 20u &&
                 !m2006_position.fault && !tx_fault && (psr & 0xA0u) == 0u &&
                 (REG(CAN + CCCR) & 1u) == 0u;
     if (ready) {
-        m2006_status.target_rotor_rpm = m2006_position_speed(percent);
+        int previous_target = m2006_status.target_rotor_rpm;
+        int target = m2006_position_speed(requested_rpm);
         int integral = m2006_status.speed_integral_x20;
-        m2006_status.command_current = m2006_speed_current(m2006_status.target_rotor_rpm,
-                                                          m2006_status.rotor_rpm, &integral);
+        /* 停车或换向时清除前一运动方向积累的电流。 */
+        if ((previous_target > 0 && target <= 0) || (previous_target < 0 && target >= 0)) {
+            integral = 0;
+        }
+        m2006_status.target_rotor_rpm = target;
+        m2006_status.command_current = m2006_speed_current(target, m2006_status.rotor_rpm, &integral);
         m2006_status.speed_integral_x20 = integral;
     } else {
         m2006_position_stop();
@@ -73,13 +80,13 @@ void m2006_control_poll(void)
         m2006_status.command_current = 0;
         m2006_status.speed_integral_x20 = 0;
         /* 取消尚未发送的旧运动指令；不触碰四轮缓冲区 0。 */
-        if (pending) REG(CAN + 0xD4u) = M2006_TX_MASK;
+        if (pending) REG(CAN + TXBCR) = M2006_TX_MASK;
     }
     if ((REG(CAN + TXBRP) & M2006_TX_MASK) != 0u) {
         if (now - last_tx_ms >= 10u) {
-            REG(CAN + 0xD4u) = M2006_TX_MASK;
+            REG(CAN + TXBCR) = M2006_TX_MASK;
             ++m2006_status.tx_timeouts;
-            tx_fault = 1; /* 重启解除，避免通信故障后继续旧位置运动。 */
+            tx_fault = 1; /* 重启解除，避免通信故障后继续运动。 */
             m2006_status.command_current = 0;
         }
         return;

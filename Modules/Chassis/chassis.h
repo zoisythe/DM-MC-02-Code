@@ -9,11 +9,12 @@
 #define RC_CENTER 1024            /* 遥控通道中位值 */
 #define RC_SPAN 800               /* 中位到端点的有效幅度 */
 #define RC_DEADBAND 65            /* 中位死区，抑制摇杆小幅抖动 */
-#define WHEEL_MAX_RPM 1500        /* 平移模式前后/每轮最高目标转子 rpm */
-#define ROTATION_WHEEL_MAX_RPM 3000 /* 旋转模式前后/每轮最高目标转子 rpm */
-#define ROTATION_MAX_RPM 1200     /* 原地满杆旋转时的轮子目标转子 rpm，不是车身角速度 */
-#define TARGET_STEP_RPM 4         /* 平移模式每 1 ms 目标最大变化量，单位 rpm */
-#define ROTATION_TARGET_STEP_RPM 8 /* 旋转模式每 1 ms 目标最大变化量，单位 rpm */
+#define WHEEL_MAX_RPM 2250        /* 两种模式共用的每轮最高目标转子 rpm */
+#define ROTATION_MAX_RPM 1800     /* 原地满杆旋转时的轮子目标转子 rpm，不是车身角速度 */
+#define TARGET_ACCEL_RPM_PER_MS 3
+#define TARGET_DECEL_RPM_PER_MS 5
+#define TARGET_APPROACH_DIVISOR 32 /* 接近目标时逐步缩小每次转速增量 */
+#define CHASSIS_STOP_RAMP_MS 300u /* 松杆后四轮目标同步降到零的时间 */
 #define FORWARD_INPUT_SIGN (-1)   /* 按现有实车前后方向取 -1 */
 #define ROTATION_INPUT_SIGN (-1)  /* 根据实车反馈对调原旋转方向；平移方向不变 */
 #define REVERSE_STEERING_TRANSITION 200 /* 归一化倒车输入达到此幅值时完成镜像 */
@@ -50,6 +51,8 @@ extern struct chassis_state chassis;
 bool chassis_sticks_centered(uint16_t vertical, uint16_t horizontal);
 /* 清除运动目标和运行标记，四个轮子的目标转速同时归零。 */
 void chassis_disarm(void);
+/* 从松杆瞬间的目标轮速起，按同一比例降低四轮目标。 */
+void chassis_decelerate(uint32_t elapsed_ms);
 /* SWA 上位平移、下位旋转；旋转模式两轴按单位圆归一化，再解算并限制目标变化量。 */
 void chassis_update(int have_command, int ready, uint16_t vertical, uint16_t horizontal,
                     uint16_t mode_switch);

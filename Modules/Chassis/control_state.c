@@ -1,8 +1,9 @@
 #include "control_state.h"
+#include "chassis.h"
 
 static bool active_phase(enum control_phase phase)
 {
-    return phase == CONTROL_RUNNING || phase == CONTROL_BRAKING;
+    return phase == CONTROL_RUNNING || phase == CONTROL_DECELERATING;
 }
 
 void chassis_control_note_tx(struct chassis_control_state *state, uint32_t now, bool nonzero)
@@ -13,24 +14,6 @@ void chassis_control_note_tx(struct chassis_control_state *state, uint32_t now, 
     state->tx_recovery_zero = state->phase == CONTROL_RECOVERING && !nonzero;
     state->tx_cancel_requested = false;
     state->tx_timed_out = false;
-}
-
-int chassis_brake_current(int rotor_rpm)
-{
-    if (rotor_rpm >= -CHASSIS_BRAKE_STOP_RPM && rotor_rpm <= CHASSIS_BRAKE_STOP_RPM)
-    {
-        return 0;
-    }
-    const int limit_rpm = CHASSIS_BRAKE_CURRENT_LIMIT / CHASSIS_BRAKE_GAIN;
-    if (rotor_rpm >= limit_rpm)
-    {
-        return -CHASSIS_BRAKE_CURRENT_LIMIT;
-    }
-    if (rotor_rpm <= -limit_rpm)
-    {
-        return CHASSIS_BRAKE_CURRENT_LIMIT;
-    }
-    return -CHASSIS_BRAKE_GAIN * rotor_rpm;
 }
 
 static void update_phase(struct chassis_control_state *state,
@@ -75,17 +58,16 @@ static void update_phase(struct chassis_control_state *state,
         case CONTROL_RUNNING:
             if (input->centered)
             {
-                state->brake_started_ms = input->now;
-                state->phase = input->wheels_slow ? CONTROL_ARMED : CONTROL_BRAKING;
+                state->stop_started_ms = input->now;
+                state->phase = CONTROL_DECELERATING;
             }
             break;
-        case CONTROL_BRAKING:
+        case CONTROL_DECELERATING:
             if (!input->centered)
             {
                 state->phase = CONTROL_RUNNING;
             }
-            else if (input->wheels_slow ||
-                     input->now - state->brake_started_ms >= CHASSIS_BRAKE_TIMEOUT_MS)
+            else if (input->now - state->stop_started_ms >= CHASSIS_STOP_RAMP_MS)
             {
                 state->phase = CONTROL_ARMED;
             }
@@ -128,7 +110,7 @@ struct chassis_control_output chassis_control_step(struct chassis_control_state 
     {
         fault = RECOVERY_TX_TIMEOUT;
     }
-    bool needs_fresh_feedback = previous == CONTROL_BRAKING ||
+    bool needs_fresh_feedback = previous == CONTROL_DECELERATING ||
                                 (previous == CONTROL_RUNNING && input->centered);
     if (fault == RECOVERY_NONE && active_phase(previous) &&
         (!input->feedback_ready || (needs_fresh_feedback && !input->feedback_fresh)))

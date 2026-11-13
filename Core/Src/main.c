@@ -6,7 +6,7 @@ int main(void)
     /* 3508 麦轮底盘：SWA 上位平移，下位旋转。 */
     chassis_control_init();
 
-    /* M2006 丝杆：VRA 控制位置，共享底盘初始化的 CAN 和遥控串口。 */
+    /* M2006 丝杆：VRA 控制升降速度，共享底盘初始化的 CAN 和遥控串口。 */
     m2006_control_init();
 
     while (1)
