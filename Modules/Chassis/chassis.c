@@ -10,25 +10,6 @@ static int magnitude(int n)
     return n < 0 ? -n : n;
 }
 
-static int ramp_target(int current, int requested)
-{
-    /* 换向先降到零，再按加速斜坡进入反方向。 */
-    if ((current > 0 && requested < 0) || (current < 0 && requested > 0))
-    {
-        requested = 0;
-    }
-    int delta = requested - current;
-    int remaining = magnitude(delta);
-    int limit = magnitude(requested) < magnitude(current)
-                    ? TARGET_DECEL_RPM_PER_MS : TARGET_ACCEL_RPM_PER_MS;
-    int step = (remaining + TARGET_APPROACH_DIVISOR - 1) / TARGET_APPROACH_DIVISOR;
-    if (step > limit)
-    {
-        step = limit;
-    }
-    return current + (delta < 0 ? -step : step);
-}
-
 /* 将 SBUS 原始通道值减去中位，应用死区后映射到 -1000～1000。 */
 static int axis(uint16_t raw)
 {
@@ -91,29 +72,6 @@ void chassis_disarm(void)
     }
 }
 
-void chassis_decelerate(uint32_t elapsed_ms)
-{
-    static int start_targets[CHASSIS_WHEEL_COUNT];
-    chassis.moving = 0;
-    chassis.forward = 0;
-    chassis.right = 0;
-    chassis.clockwise = 0;
-
-    if (elapsed_ms == 0u)
-    {
-        for (int i = 0; i < CHASSIS_WHEEL_COUNT; ++i)
-        {
-            start_targets[i] = chassis.targets[i];
-        }
-    }
-    int remaining_ms = elapsed_ms < CHASSIS_STOP_RAMP_MS
-                           ? (int)(CHASSIS_STOP_RAMP_MS - elapsed_ms) : 0;
-    for (int i = 0; i < CHASSIS_WHEEL_COUNT; ++i)
-    {
-        chassis.targets[i] = start_targets[i] * remaining_ms / (int)CHASSIS_STOP_RAMP_MS;
-    }
-}
-
 /* SWA 上位平移、下位旋转；中间区间保持上次模式（上电默认平移）。
  * 旋转模式将前后与旋转两轴按欧几里得模长归一化，不再优先截掉旋转输入。 */
 void chassis_update(int have_command, int ready, uint16_t vertical, uint16_t horizontal,
@@ -153,20 +111,11 @@ void chassis_update(int have_command, int ready, uint16_t vertical, uint16_t hor
     {
         r = horizontal_input;
     }
-    int neutral = f == 0 && r == 0 && turn_rpm == 0;
     chassis.armed = 1;
     chassis.forward = f;
     chassis.right = r;
     chassis.clockwise = chassis.rotation_mode != 0u ? horizontal_input : 0;
-    chassis.moving = (uint32_t)!neutral;
-    if (neutral)
-    {
-        for (int i = 0; i < CHASSIS_WHEEL_COUNT; ++i)
-        {
-            chassis.targets[i] = 0;
-        }
-        return;
-    }
+    chassis.moving = f != 0 || r != 0 || turn_rpm != 0;
 
     /* X 型麦轮按轮位解算，随后应用各电机的前进符号。 */
     int forward_rpm = f * WHEEL_MAX_RPM / 1000;
@@ -193,7 +142,6 @@ void chassis_update(int have_command, int ready, uint16_t vertical, uint16_t hor
     }
     for (int i = 0; i < CHASSIS_WHEEL_COUNT; ++i)
     {
-        int requested = demand[i] * WHEEL_MAX_RPM / scale * sign[i];
-        chassis.targets[i] = ramp_target(chassis.targets[i], requested);
+        chassis.targets[i] = demand[i] * WHEEL_MAX_RPM / scale * sign[i];
     }
 }

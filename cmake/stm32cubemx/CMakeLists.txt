@@ -4,6 +4,7 @@ set(cpu_flags -mcpu=cortex-m7 -mthumb -mfloat-abi=soft)
 
 target_sources(firmware PRIVATE
     "${PROJECT_SOURCE_DIR}/Core/Src/board.c"
+    "${PROJECT_SOURCE_DIR}/Core/Src/servo_pwm.c"
     "${PROJECT_SOURCE_DIR}/Core/Src/status_led.c"
     "${PROJECT_SOURCE_DIR}/startup_stm32h723xx.s"
 )

@@ -10,6 +10,7 @@ _Static_assert(sizeof(uint32_t) == 4, "32-bit registers required");
 #define REG(a)                                                                                     \
     (*(volatile uint32_t *)(a)) /* 按地址访问 32 位硬件寄存器，volatile 禁止优化掉真实访问 */
 #define RCC 0x58024400u         /* 复位与时钟控制器基地址 */
+#define GPIOA_BASE 0x58020000u   /* A 组 GPIO 基地址 */
 #define GPIOB 0x58020400u       /* B 组 GPIO 基地址 */
 #define GPIOC 0x58020800u       /* C 组 GPIO 基地址 */
 #define GPIOD 0x58020C00u       /* D 组 GPIO 基地址 */

@@ -22,7 +22,7 @@ enum control_phase
     CONTROL_RUNNING = 4,            /* 正在计算并发送驱动电流 */
     CONTROL_RECOVERING = 7,         /* 通信异常后暂发零电流，等待恢复 */
     CONTROL_ARMED = 8,              /* 已回中解锁，等待拨杆 */
-    CONTROL_DECELERATING = 9        /* 正常松杆，四轮目标同步降速 */
+    CONTROL_BRAKING = 9            /* 松杆后立即制动，等待四轮实际停稳 */
 };
 
 enum recovery_reason
@@ -38,7 +38,7 @@ struct chassis_control_state
 {
     enum control_phase phase;
     enum recovery_reason recovery_reason;
-    uint32_t recovery_started_ms, recovery_zero_frames, stop_started_ms;
+    uint32_t recovery_started_ms, recovery_zero_frames;
     uint32_t wait_frame, remote_interruptions;
     uint32_t tx_started_ms;
     bool ready_for_center;
@@ -50,7 +50,7 @@ struct chassis_control_input
     uint32_t now, remote_frame, remote_interruptions;
     enum recovery_reason can_fault;
     bool remote_valid, centered;
-    bool hardware_ready, feedback_ready, feedback_fresh;
+    bool hardware_ready, feedback_ready, feedback_fresh, wheels_stopped;
     bool tx_pending, tx_sent;
 };
 

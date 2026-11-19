@@ -3,7 +3,6 @@
 
 #include <stdbool.h>
 
-#define GPIOA_BASE 0x58020000u
 #define SPI6_BASE 0x58001400u
 #define BDMA_BASE 0x58025400u
 #define DMAMUX2_BASE 0x58025800u

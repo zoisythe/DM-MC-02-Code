@@ -1,9 +1,8 @@
 #include "control_state.h"
-#include "chassis.h"
 
 static bool active_phase(enum control_phase phase)
 {
-    return phase == CONTROL_RUNNING || phase == CONTROL_DECELERATING;
+    return phase == CONTROL_RUNNING || phase == CONTROL_BRAKING;
 }
 
 void chassis_control_note_tx(struct chassis_control_state *state, uint32_t now, bool nonzero)
@@ -58,16 +57,15 @@ static void update_phase(struct chassis_control_state *state,
         case CONTROL_RUNNING:
             if (input->centered)
             {
-                state->stop_started_ms = input->now;
-                state->phase = CONTROL_DECELERATING;
+                state->phase = input->wheels_stopped ? CONTROL_ARMED : CONTROL_BRAKING;
             }
             break;
-        case CONTROL_DECELERATING:
+        case CONTROL_BRAKING:
             if (!input->centered)
             {
                 state->phase = CONTROL_RUNNING;
             }
-            else if (input->now - state->stop_started_ms >= CHASSIS_STOP_RAMP_MS)
+            else if (input->wheels_stopped)
             {
                 state->phase = CONTROL_ARMED;
             }
@@ -110,7 +108,7 @@ struct chassis_control_output chassis_control_step(struct chassis_control_state 
     {
         fault = RECOVERY_TX_TIMEOUT;
     }
-    bool needs_fresh_feedback = previous == CONTROL_DECELERATING ||
+    bool needs_fresh_feedback = previous == CONTROL_BRAKING ||
                                 (previous == CONTROL_RUNNING && input->centered);
     if (fault == RECOVERY_NONE && active_phase(previous) &&
         (!input->feedback_ready || (needs_fresh_feedback && !input->feedback_fresh)))

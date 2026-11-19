@@ -1,4 +1,6 @@
 {
   "device": "STM32H723VGT6",
-  "toolchain": "CLANG"
+  "toolchain": "CLANG",
+  "core": "Cortex-M7",
+  "order": 0
 }

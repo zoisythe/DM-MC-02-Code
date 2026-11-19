@@ -22,7 +22,9 @@ if(NOT CMAKE_CROSSCOMPILING OR NOT CMAKE_C_COMPILER_ID STREQUAL "Clang" OR NOT S
 endif()
 enable_language(ASM)
 
-add_executable(firmware Core/Src/main.c)
+option(GRIPPER_BENCH "Build the ST-Link controlled gripper test firmware" OFF)
+
+add_executable(firmware)
 set_target_properties(firmware PROPERTIES SUFFIX ".elf")
 target_compile_options(firmware PRIVATE
     $<$<CONFIG:Debug>:-g3>
@@ -31,9 +33,15 @@ target_compile_options(firmware PRIVATE
 )
 
 add_subdirectory(cmake/stm32cubemx)
-add_subdirectory(Modules/Chassis)
-add_subdirectory(Modules/M2006)
-add_subdirectory(Modules/Remote)
+if(GRIPPER_BENCH)
+    target_sources(firmware PRIVATE Modules/Gripper/gripper_bench.c)
+else()
+    target_sources(firmware PRIVATE Core/Src/main.c)
+    add_subdirectory(Modules/Chassis)
+    add_subdirectory(Modules/Gripper)
+    add_subdirectory(Modules/M2006)
+    add_subdirectory(Modules/Remote)
+endif()
 
 add_custom_command(
     OUTPUT firmware.hex firmware.bin

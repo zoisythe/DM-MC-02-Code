@@ -274,30 +274,54 @@ void chassis_control_init(void)
     control.phase = CONTROL_WAITING;
     chassis_status.phase = control.phase;
 }
+static bool wheels_stopped(void)
+{
+    for (uint32_t i = 0; i < CHASSIS_WHEEL_COUNT; ++i)
+    {
+        int rpm = motors[i].rotor_rpm;
+        if (rpm < -CHASSIS_STOP_RPM || rpm > CHASSIS_STOP_RPM)
+        {
+            return false;
+        }
+    }
+    return true;
+}
+
 /* 运行状态已经由控制状态机确定，电机输出只由本周期状态产生。 */
-static void update_motor_commands(uint32_t now, uint16_t vertical, uint16_t horizontal)
+static void update_motor_commands(uint16_t vertical, uint16_t horizontal)
 {
     bool driving = control.phase == CONTROL_RUNNING;
-    bool decelerating = control.phase == CONTROL_DECELERATING;
-    if (decelerating)
+    bool braking = control.phase == CONTROL_BRAKING;
+    bool armed = driving || braking || control.phase == CONTROL_ARMED;
+    int previous_targets[CHASSIS_WHEEL_COUNT];
+    for (uint32_t i = 0; i < CHASSIS_WHEEL_COUNT; ++i)
     {
-        chassis_decelerate(now - control.stop_started_ms);
+        previous_targets[i] = chassis.targets[i];
     }
-    else
+    chassis_update(armed, armed, vertical, horizontal, sbus_status.channels[CHASSIS_MODE_CHANNEL]);
+
+    int currents[CHASSIS_WHEEL_COUNT] = {0};
+    if (braking)
     {
-        bool armed = driving || control.phase == CONTROL_ARMED;
-        chassis_update(armed, armed, vertical, horizontal, sbus_status.channels[CHASSIS_MODE_CHANNEL]);
+        int measured[CHASSIS_WHEEL_COUNT];
+        for (uint32_t i = 0; i < CHASSIS_WHEEL_COUNT; ++i)
+        {
+            measured[i] = motors[i].rotor_rpm;
+        }
+        chassis_brake_currents(measured, currents);
     }
 
     for (uint32_t i = 0; i < CHASSIS_WHEEL_COUNT; ++i)
     {
         int integral = 0;
-        int command = 0;
-        if ((driving && chassis.moving) || decelerating)
+        if (driving && chassis.moving)
         {
             int target = chassis.targets[i];
-            integral = target == 0 ? 0 : motors[i].integral_x20;
-            command = chassis_speed_current(target, motors[i].rotor_rpm, &integral);
+            if (target * previous_targets[i] > 0)
+            {
+                integral = motors[i].integral_x20;
+            }
+            currents[i] = chassis_speed_current(target, motors[i].rotor_rpm, &integral);
             if (target == 0)
             {
                 /* 换向经过零速目标时，清除上一个方向的积分。 */
@@ -305,6 +329,7 @@ static void update_motor_commands(uint32_t now, uint16_t vertical, uint16_t hori
             }
         }
         motors[i].integral_x20 = integral;
+        int command = currents[i];
         motors[i].command_current = command;
         uint32_t magnitude = (uint32_t)(command < 0 ? -command : command);
         if (magnitude > motors[i].peak_abs_command)
@@ -312,7 +337,7 @@ static void update_motor_commands(uint32_t now, uint16_t vertical, uint16_t hori
             motors[i].peak_abs_command = magnitude;
         }
     }
-    chassis_status.action_active = driving || decelerating;
+    chassis_status.action_active = driving || braking;
     chassis_status.target_rotor_rpm = chassis.targets[WHEEL_FRONT_LEFT];
     chassis_status.command_current = motors[WHEEL_FRONT_LEFT].command_current;
     chassis_status.speed_integral_x20 = motors[WHEEL_FRONT_LEFT].integral_x20;
@@ -333,14 +358,14 @@ static uint32_t status_color(uint32_t now, bool remote_valid)
 }
 
 /* 通信接收持续轮询，底盘状态与 0x200 指令每 1 ms 更新一次。 */
-void chassis_control_poll(void)
+uint32_t chassis_control_poll(void)
 {
     poll_remote(chassis_status.milliseconds);
     poll_can_errors();
     receive_feedback();
     if ((REG(0xE000E010u) & (1u << 16)) == 0u)
     {
-        return;
+        return chassis_status.milliseconds;
     }
     uint32_t now = ++chassis_status.milliseconds;
     m2006_control_set_time(now);
@@ -397,6 +422,7 @@ void chassis_control_poll(void)
                           chassis_status.completed >= CHASSIS_READY_FRAMES,
         .feedback_ready = feedback_ready,
         .feedback_fresh = all_feedback_ready(now, CHASSIS_STOP_FEEDBACK_MS),
+        .wheels_stopped = wheels_stopped(),
         .tx_pending = tx_pending,
         .tx_sent = !tx_pending && (REG(CAN + TXBTO) & CHASSIS_TX_MASK) != 0u,
     };
@@ -414,11 +440,12 @@ void chassis_control_poll(void)
     chassis_status.last_recovery_reason = control.recovery_reason;
     chassis_status.recovery_until_ms = control.recovery_started_ms + CHASSIS_RECOVERY_WAIT_MS;
     chassis_status.recovery_zero_frames = control.recovery_zero_frames;
-    update_motor_commands(now, vertical, horizontal);
+    update_motor_commands(vertical, horizontal);
 
     if (!tx_pending && !startup_wait && !busoff && !can_in_init)
     {
         send_current(now);
     }
     status_led_poll(now, status_color(now, input.remote_valid));
+    return now;
 }
