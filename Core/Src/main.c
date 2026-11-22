@@ -2,6 +2,7 @@
 #include "gripper_test.h"
 #include "m2006_control.h"
 #include "servo_pwm.h"
+#include "ym3260_control.h"
 
 int main(void)
 {
@@ -11,6 +12,7 @@ int main(void)
     /* M2006 丝杆：VRA 控制升降速度，共享底盘初始化的 CAN 和遥控串口。 */
     m2006_control_init();
     servo_pwm_init();
+    servo_pwm_enable_pa2();
 
     while (1)
     {
@@ -19,5 +21,6 @@ int main(void)
 
         m2006_control_poll();
         gripper_test_poll(now);
+        ym3260_control_poll(now);
     }
 }

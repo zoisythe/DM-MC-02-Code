@@ -1,5 +1,6 @@
 #include "m2006_remote.h"
-#include "m2006_position.h"
+
+#define M2006_MAX_ROTOR_RPM 3600 /* 输出轴 100 rpm，约 13.3 mm/s。 */
 
 int m2006_remote_speed_rpm(uint16_t raw)
 {

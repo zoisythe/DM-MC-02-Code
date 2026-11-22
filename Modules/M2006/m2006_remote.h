@@ -8,6 +8,6 @@
 #define M2006_VRA_CENTER 1024u
 #define M2006_VRA_RIGHT 1807u
 #define M2006_VRA_DEADBAND 40u
-/* 正值上升，负值下降，单位为转子 rpm。仅对有效 SBUS 输入调用。 */
+/* 返回电机方向下的目标转速，低于中位为负，高于中位为正，单位为转子 rpm。 */
 int m2006_remote_speed_rpm(uint16_t raw);
 #endif
