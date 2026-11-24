@@ -41,7 +41,7 @@ else()
     add_subdirectory(Modules/Gripper)
     add_subdirectory(Modules/M2006)
     add_subdirectory(Modules/Remote)
-    add_subdirectory(Modules/YM3260)
+    add_subdirectory(Modules/Slide)
 endif()
 
 add_custom_command(

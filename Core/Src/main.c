@@ -2,7 +2,7 @@
 #include "gripper_test.h"
 #include "m2006_control.h"
 #include "servo_pwm.h"
-#include "ym3260_control.h"
+#include "slide_control.h"
 
 int main(void)
 {
@@ -13,6 +13,7 @@ int main(void)
     m2006_control_init();
     servo_pwm_init();
     servo_pwm_enable_pa2();
+    slide_control_init();
 
     while (1)
     {
@@ -21,6 +22,6 @@ int main(void)
 
         m2006_control_poll();
         gripper_test_poll(now);
-        ym3260_control_poll(now);
+        slide_control_poll(now);
     }
 }
