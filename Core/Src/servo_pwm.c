@@ -46,8 +46,6 @@ enum
 
     TIMER_CLOCK_MHZ = 64u,
     SERVO_FRAME_US = 20000u,
-    SERVO_MIN_US = 500u,
-    SERVO_MAX_US = 2500u,
 };
 
 static void configure_pin_low(uint32_t port, unsigned int pin)
@@ -109,14 +107,19 @@ void servo_pwm_stop(void)
     REG(TIM2_BASE + TIM_CCR1) = 0u;
 }
 
-void servo_pwm_enable_pa2(void)
+void servo_pwm_enable_pa2(uint16_t pulse_us)
 {
     /* PA2 AF1 = TIM2_CH3，共用 50 Hz 周期，脉宽由 CCR3 独立设置。 */
     configure_pin_low(GPIOA_BASE, 2u);
-    REG(TIM2_BASE + TIM_CCR3) = 0u;
     REG(TIM2_BASE + TIM_CCMR2) = TIM_OC_PWM_MODE_1 | TIM_OC_PRELOAD;
+    servo_pwm_set_pa2_pulse_us(pulse_us);
     REG(TIM2_BASE + TIM_CCER) |= TIM_CH3_ENABLE;
     connect_timer_to_pin(GPIOA_BASE, 2u);
+}
+
+void servo_pwm_set_pa2_pulse_us(uint16_t pulse_us)
+{
+    REG(TIM2_BASE + TIM_CCR3) = (pulse_us >= SERVO_MIN_US && pulse_us <= SERVO_MAX_US) ? pulse_us : 0u;
 }
 
 void servo_pwm_enable_slide(void)

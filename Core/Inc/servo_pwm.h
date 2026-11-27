@@ -3,6 +3,8 @@
 
 #include <stdint.h>
 
+enum { SERVO_MIN_US = 500u, SERVO_MAX_US = 2500u };
+
 /* 在板级时钟初始化后调用。PA0 在首次设定脉宽之前保持低电平。 */
 void servo_pwm_init(void);
 
@@ -12,8 +14,9 @@ void servo_pwm_set_pulse_us(uint16_t pulse_us);
 /* 在下一帧边界停止发脉冲，保留当前帧的完整波形。 */
 void servo_pwm_stop(void);
 
-/* 在 servo_pwm_init() 之后调用，配置夹爪俯仰 PA2，初始无脉冲。 */
-void servo_pwm_enable_pa2(void);
+/* 在 servo_pwm_init() 之后调用，配置夹爪俯仰 PA2 并设定初始脉宽。 */
+void servo_pwm_enable_pa2(uint16_t pulse_us);
+void servo_pwm_set_pa2_pulse_us(uint16_t pulse_us);
 
 /* 启用滑轨平移 PE9 和俯仰 PE13，两路初始无脉冲。 */
 void servo_pwm_enable_slide(void);

@@ -9,8 +9,8 @@
 #define RC_CENTER 1024            /* 遥控通道中位值 */
 #define RC_SPAN 800               /* 中位到端点的有效幅度 */
 #define RC_DEADBAND 40            /* 中位死区，抑制摇杆小幅抖动 */
-#define WHEEL_MAX_RPM 2250        /* 两种模式共用的每轮最高目标转子 rpm */
-#define ROTATION_MAX_RPM 1800     /* 原地满杆旋转时的轮子目标转子 rpm，不是车身角速度 */
+#define WHEEL_MAX_RPM 3938        /* 2250 × 1.75，四舍五入到整数转子 rpm */
+#define ROTATION_MAX_RPM 3150     /* 1800 × 1.75，原地满杆旋转的轮子目标转子 rpm */
 #define FORWARD_INPUT_SIGN (-1)   /* 按现有实车前后方向取 -1 */
 #define ROTATION_INPUT_SIGN (-1)  /* 根据实车反馈对调原旋转方向；平移方向不变 */
 #define REVERSE_STEERING_TRANSITION 200 /* 归一化倒车输入达到此幅值时完成镜像 */

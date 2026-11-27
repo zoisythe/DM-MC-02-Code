@@ -42,6 +42,7 @@ else()
     add_subdirectory(Modules/M2006)
     add_subdirectory(Modules/Remote)
     add_subdirectory(Modules/Slide)
+    add_subdirectory(Modules/Actuator)
 endif()
 
 add_custom_command(

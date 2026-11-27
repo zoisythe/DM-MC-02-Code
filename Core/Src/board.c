@@ -1,8 +1,11 @@
 /*
  * board.c
- * DM-MC02 公共板级支持：时钟、CAN1 初始化、输出初态和故障入口。
+ * DM-MC02 公共板级支持：时钟、CAN2 初始化、输出初态和故障入口。
  */
 #include "board.h"
+
+#define POWER_OUT2_PIN 13u
+#define POWER_5V_PIN 15u
 
 static void (*fault_handler)(uint32_t code);
 
@@ -75,16 +78,19 @@ void clock_init(void)
     REG(0xE000E010u) = 5u;
 }
 
-/* 初始化 CAN1：PD0 接收、PD1 发送，经典 CAN 1 Mbps；只供当前选择的控制模块调用一次。 */
+/* CAN2：PB5 / PB6 的 AF9 分别连接板载收发器的 RX / TX。 */
 void can_init(void)
 {
-    REG(RCC + AHB4ENR) |= 1u << 3;
+    const uint32_t pins = (1u << 5) | (1u << 6);
+    const uint32_t mode_mask = (3u << 10) | (3u << 12);
+    const uint32_t mode_af = (2u << 10) | (2u << 12);
+    REG(RCC + AHB4ENR) |= 1u << 1;
     (void)REG(RCC + AHB4ENR);
-    REG(GPIOD + 0x00u) = (REG(GPIOD + 0x00u) & ~15u) | 10u;
-    REG(GPIOD + 0x04u) &= ~3u;
-    REG(GPIOD + 0x08u) = (REG(GPIOD + 0x08u) & ~15u) | 10u;
-    REG(GPIOD + 0x0Cu) &= ~15u;
-    REG(GPIOD + 0x20u) = (REG(GPIOD + 0x20u) & ~255u) | 0x99u;
+    REG(GPIOB + 0x04u) &= ~pins;
+    REG(GPIOB + 0x08u) = (REG(GPIOB + 0x08u) & ~mode_mask) | mode_af;
+    REG(GPIOB + 0x0Cu) &= ~mode_mask;
+    REG(GPIOB + 0x20u) = (REG(GPIOB + 0x20u) & ~((15u << 20) | (15u << 24))) | (9u << 20) | (9u << 24);
+    REG(GPIOB + 0x00u) = (REG(GPIOB + 0x00u) & ~mode_mask) | mode_af;
     REG(RCC + APB1HENR) |= 1u << 8;
     (void)REG(RCC + APB1HENR);
     REG(RCC + APB1HRSTR) |= 1u << 8;
@@ -100,7 +106,7 @@ void can_init(void)
     /* 64 MHz / 4 / (1 + 13 + 2) = 1 Mbps，采样点 87.5%。 */
     REG(CAN + NBTP) = (1u << 25) | (3u << 16) | (12u << 8) | 1u;
 
-    /* 清空共享 10 KiB 消息 RAM；目前只初始化并使用 CAN1。 */
+    /* 只启用 CAN2，沿用共享消息 RAM 起始位置的 8 个接收和 2 个发送槽。 */
     for (uint32_t i = 0u; i < 2560u; ++i)
     {
         REG(RAM + 4u * i) = 0u;
@@ -122,15 +128,29 @@ void can_init(void)
 /* 先关闭加热、蜂鸣器和受控电源输出，沿用已跑通版本的启动初态。 */
 void safe_outputs(void)
 {
+    const uint32_t power_pins = (1u << POWER_OUT2_PIN) | (1u << POWER_5V_PIN);
+    const uint32_t power_mode_mask = (3u << (2u * POWER_OUT2_PIN)) | (3u << (2u * POWER_5V_PIN));
+    const uint32_t power_mode_output = (1u << (2u * POWER_OUT2_PIN)) | (1u << (2u * POWER_5V_PIN));
+
     REG(RCC + AHB4ENR) |= 6u;
     (void)REG(RCC + AHB4ENR);
     REG(GPIOB + 0x18u) = (1u << 17) | (1u << 31);
     REG(GPIOB + 4u) &= ~((1u << 1) | (1u << 15));
     REG(GPIOB + 0xCu) &= ~((3u << 2) | (3u << 30));
     REG(GPIOB) = (REG(GPIOB) & ~((3u << 2) | (3u << 30))) | (1u << 2) | (1u << 30);
-    REG(GPIOC + 0x18u) = 0xE0000000u;
-    REG(GPIOC + 4u) &= ~0xE000u;
-    REG(GPIOC + 0xCu) &= ~0xFC000000u;
-    REG(GPIOC) = (REG(GPIOC) & ~0xFC000000u) | 0x54000000u;
+    REG(GPIOC + 0x18u) = power_pins << 16;
+    REG(GPIOC + 4u) &= ~power_pins;
+    REG(GPIOC + 0xCu) &= ~power_mode_mask;
+    REG(GPIOC) = (REG(GPIOC) & ~power_mode_mask) | power_mode_output;
     REG(0x5C001004u) |= (1u << 21) | (1u << 22) | 1u;
+}
+
+void board_enable_power_out2(void)
+{
+    REG(GPIOC + 0x18u) = 1u << POWER_OUT2_PIN;
+}
+
+void board_enable_5v_output(void)
+{
+    REG(GPIOC + 0x18u) = 1u << POWER_5V_PIN;
 }
