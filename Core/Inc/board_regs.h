@@ -15,7 +15,7 @@ _Static_assert(sizeof(uint32_t) == 4, "32-bit registers required");
 #define GPIOC 0x58020800u       /* C 组 GPIO 基地址 */
 #define GPIOD 0x58020C00u       /* D 组 GPIO 基地址 */
 #define UART5 0x40005000u       /* SBUS 接收串口基地址 */
-#define CAN 0x4000A000u         /* FDCAN1 寄存器基地址 */
+#define CAN 0x4000A400u         /* FDCAN2 寄存器基地址 */
 #define RAM 0x4000AC00u         /* FDCAN 共享消息 RAM 基地址 */
 #define CR 0x00u                /* RCC 时钟控制偏移 */
 #define CFGR 0x10u              /* 系统时钟配置偏移 */

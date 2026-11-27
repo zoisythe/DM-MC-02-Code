@@ -1,4 +1,4 @@
-/* M2006 与四轮共享 CAN1/UART；必须先初始化四轮，再初始化本模块。 */
+/* M2006 与四轮共享 CAN2/UART；必须先初始化四轮，再初始化本模块。 */
 #ifndef M2006_CONTROL_H
 #define M2006_CONTROL_H
 #include <stdint.h>

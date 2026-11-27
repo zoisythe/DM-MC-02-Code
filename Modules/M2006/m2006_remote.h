@@ -7,7 +7,8 @@
 #define M2006_VRA_LEFT 240u
 #define M2006_VRA_CENTER 1024u
 #define M2006_VRA_RIGHT 1807u
-#define M2006_VRA_DEADBAND 40u
-/* 正值上升，负值下降，单位为转子 rpm。仅对有效 SBUS 输入调用。 */
+/* 单侧死区取 VRA 总行程的 1/4，四舍五入到整数。 */
+#define M2006_VRA_DEADBAND ((M2006_VRA_RIGHT - M2006_VRA_LEFT + 2u) / 4u)
+/* 返回目标转子 rpm，死区内为零，两侧线性映射到各自的满速。 */
 int m2006_remote_speed_rpm(uint16_t raw);
 #endif
