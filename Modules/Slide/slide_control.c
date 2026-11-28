@@ -14,6 +14,9 @@ enum
     TRAVEL_BACKWARD_US = 1400,
 
     PITCH_START_US = 800,      /* 上电位置，单位为 μs。 */
+    PITCH_SPEED_US_PER_S = 150,
+    PITCH_ACCELERATION_US_PER_S2 = 450,
+    PITCH_SETTLE_MS = 150u,
 };
 
 /* VRB 从 240 到 1807 均分五档，1024 中位对应 1200 μs。 */
@@ -29,7 +32,8 @@ static bool receiving;
 void slide_control_init(void)
 {
     servo_pwm_enable_slide();
-    servo_position_init(&pitch, PITCH_START_US);
+    servo_position_init(&pitch, PITCH_START_US, PITCH_SPEED_US_PER_S,
+                        PITCH_ACCELERATION_US_PER_S2);
     servo_pwm_set_slide_pitch_us(pitch.pulse_us);
 }
 
@@ -56,8 +60,12 @@ void slide_control_poll(uint32_t now)
         servo_pwm_set_slide_pitch_us(pitch.pulse_us);
         receiving = true;
     }
-    if (servo_position_update(&pitch, pitch_levels, sizeof pitch_levels / sizeof pitch_levels[0],
-                              sbus_status.channels[VRB_CHANNEL], new_frame, now))
+    if (new_frame)
+    {
+        servo_position_select_level(&pitch, pitch_levels, sizeof pitch_levels / sizeof pitch_levels[0],
+                                    sbus_status.channels[VRB_CHANNEL], now, PITCH_SETTLE_MS);
+    }
+    if (servo_position_step(&pitch, now))
     {
         servo_pwm_set_slide_pitch_us(pitch.pulse_us);
     }

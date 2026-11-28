@@ -5,6 +5,7 @@
 #include "board.h"
 
 #define POWER_OUT2_PIN 13u
+#define POWER_OUT1_PIN 14u
 #define POWER_5V_PIN 15u
 
 static void (*fault_handler)(uint32_t code);
@@ -128,9 +129,12 @@ void can_init(void)
 /* 先关闭加热、蜂鸣器和受控电源输出，沿用已跑通版本的启动初态。 */
 void safe_outputs(void)
 {
-    const uint32_t power_pins = (1u << POWER_OUT2_PIN) | (1u << POWER_5V_PIN);
-    const uint32_t power_mode_mask = (3u << (2u * POWER_OUT2_PIN)) | (3u << (2u * POWER_5V_PIN));
-    const uint32_t power_mode_output = (1u << (2u * POWER_OUT2_PIN)) | (1u << (2u * POWER_5V_PIN));
+    const uint32_t power_pins = (1u << POWER_OUT2_PIN) | (1u << POWER_OUT1_PIN) |
+                                (1u << POWER_5V_PIN);
+    const uint32_t power_mode_mask = (3u << (2u * POWER_OUT2_PIN)) | (3u << (2u * POWER_OUT1_PIN)) |
+                                     (3u << (2u * POWER_5V_PIN));
+    const uint32_t power_mode_output = (1u << (2u * POWER_OUT2_PIN)) | (1u << (2u * POWER_OUT1_PIN)) |
+                                       (1u << (2u * POWER_5V_PIN));
 
     REG(RCC + AHB4ENR) |= 6u;
     (void)REG(RCC + AHB4ENR);
@@ -143,14 +147,4 @@ void safe_outputs(void)
     REG(GPIOC + 0xCu) &= ~power_mode_mask;
     REG(GPIOC) = (REG(GPIOC) & ~power_mode_mask) | power_mode_output;
     REG(0x5C001004u) |= (1u << 21) | (1u << 22) | 1u;
-}
-
-void board_enable_power_out2(void)
-{
-    REG(GPIOC + 0x18u) = 1u << POWER_OUT2_PIN;
-}
-
-void board_enable_5v_output(void)
-{
-    REG(GPIOC + 0x18u) = 1u << POWER_5V_PIN;
 }

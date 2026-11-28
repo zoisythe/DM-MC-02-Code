@@ -14,10 +14,6 @@ void wait_bits(uint32_t address, uint32_t mask, uint32_t value, uint32_t error);
 void clock_init(void);
 /* 初始化 CAN2：PB5 接收、PB6 发送，经典 CAN 1 Mbps。 */
 void can_init(void);
-/* 先关闭加热、蜂鸣器和受控电源输出，沿用已跑通版本的启动初态。 */
+/* 关闭加热、蜂鸣器、两路 XT30 动力输出和对外 5 V。 */
 void safe_outputs(void);
-/* safe_outputs() 之后拉高 PC13，使能 P8 的 VCC_OUT2 动力电源。 */
-void board_enable_power_out2(void);
-/* safe_outputs() 之后拉高 PC15，使能板载对外 5 V 电源。 */
-void board_enable_5v_output(void);
 #endif

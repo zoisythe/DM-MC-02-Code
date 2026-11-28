@@ -1,5 +1,4 @@
 #include "actuator_control.h"
-#include "board.h"
 #include "chassis_control.h"
 #include "gripper_test.h"
 #include "m2006_control.h"
@@ -19,10 +18,6 @@ int main(void)
     servo_pwm_init();
     gripper_test_init();
     slide_control_init();
-
-    /* 初始化完成后，使能 PC15 对应的对外 5 V 和 PC13 对应的 VCC_OUT2。 */
-    board_enable_5v_output();
-    board_enable_power_out2();
 
     while (1)
     {
